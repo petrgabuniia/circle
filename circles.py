@@ -7,7 +7,7 @@ def find_circles(image):
         return None
     
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=100, param1=50, param2=30, minRadius=10, maxRadius=2000)
+    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=100, param1=50, param2=25, minRadius=10, maxRadius=2000)
     
     if circles is not None:
         circles = np.uint16(np.around(circles))
@@ -30,7 +30,24 @@ def find_circles(image):
     else:
         print("No circles detected")
         return None
-    
+        
+
+def watershed_segmentation(img):
+    assert img is not None, "file could not be read, check with os.path.exists()"
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    kernel = np.ones((3,3), np.uint8)
+    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
+    sure_bg = cv2.dilate(opening, kernel, iterations=3)
+
+    sure_bg_color = cv2.cvtColor(sure_bg, cv2.COLOR_GRAY2BGR)
+
+    return sure_bg_color
+
+   
 
 def calculate_precision(image, center, radius, color_threshold=20):
     if image is None:
@@ -88,8 +105,8 @@ def draw_circles(circles, image):
     cv2.destroyAllWindows()
 
 
-image = cv2.imread('test_images/1.png', cv2.IMREAD_COLOR)
+image = cv2.imread('test_images/13.png', cv2.IMREAD_COLOR)
 
-circles = find_circles(image)
+circles = find_circles(watershed_segmentation(image))
 
 draw_circles(circles, image)
