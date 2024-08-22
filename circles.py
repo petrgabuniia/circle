@@ -1,5 +1,84 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+
+def calculate_intersection_area(circle1, circle2):
+    x1, y1, r1 = circle1
+    x2, y2, r2 = circle2
+    
+    d = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+    # No intersection
+    if d >= r1 + r2:
+        return 0
+    # One circle is completely inside the other
+    elif d <= abs(r1 - r2):
+        return np.pi * min(r1, r2)**2
+    
+    # Calculate the intersection area
+    r1_squared = r1 ** 2
+    r2_squared = r2 ** 2
+
+    part1 = r1_squared * np.arccos((d**2 + r1_squared - r2_squared) / (2 * d * r1))
+    part2 = r2_squared * np.arccos((d**2 + r2_squared - r1_squared) / (2 * d * r2))
+    part3 = 0.5 * np.sqrt((-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2))
+    
+    intersection_area = part1 + part2 - part3
+    return intersection_area
+
+def is_completely_inside(circle1, circle2):
+    x1, y1, r1 = circle1
+    x2, y2, r2 = circle2
+    distance = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    return distance + r1 <= r2
+
+def should_remove(circle1, circle2):
+    x1, y1, r1 = circle1
+    x2, y2, r2 = circle2
+
+    area1 = np.pi * r1**2
+    area2 = np.pi * r2**2
+
+    # Calculate intersection area
+    intersection_area = calculate_intersection_area(circle1, circle2)
+
+    if is_completely_inside(circle1, circle2):
+        return circle1  # Remove the smaller one that's inside
+    if is_completely_inside(circle2, circle1):
+        return circle2  # Remove the smaller one that's inside
+
+    # Check if the intersection area is greater than 50% of the smaller circle's area
+    if intersection_area > 0.5 * min(area1, area2):
+        # Remove the smaller circle to minimize overlap
+        if area1 < area2:
+            print(f"Removing circle at ({x1}, {y1}) with radius {r1}")
+            return circle1
+        else:
+            print(f"Removing circle at ({x2}, {y2}) with radius {r2}")
+            return circle2
+
+    return None
+
+def remove_intersecting_circles(circles):
+    while True:
+        to_remove = set()
+        n = len(circles)
+        for i in range(n):
+            for j in range(i + 1, n):
+                circle1 = circles[i]
+                circle2 = circles[j]
+                removal_candidate = should_remove(circle1, circle2)
+                if removal_candidate is not None:
+                    to_remove.add(tuple(removal_candidate))
+        
+        # If no circles are marked for removal, break the loop
+        if not to_remove:
+            break
+        
+        # Remove all circles that are marked for removal
+        circles = [c for c in circles if tuple(c) not in to_remove]
+        
+    return circles
 
 def find_circles(image):
     if image is None:
@@ -12,7 +91,7 @@ def find_circles(image):
     else:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=100, param1=50, param2=10, minRadius=5, maxRadius=2000)
+    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=75, param1=50, param2=10, minRadius=10, maxRadius=2000)
     
     if circles is not None:
         circles = np.uint16(np.around(circles))
@@ -24,30 +103,26 @@ def find_circles(image):
                 valid_circles.append(i)
             print(f"Circle at ({i[0]}, {i[1]}) with radius {i[2]} has precision: {precision:.2f}%")
         
-        valid_circles = np.array(valid_circles, dtype=np.uint16)
+        # Convert the list of circles back to the expected format
         if len(valid_circles) > 0:
-            valid_circles = np.expand_dims(valid_circles, axis=0)  
-            print(f"Number of valid circles detected: {len(valid_circles[0, :])}")
+            valid_circles = np.expand_dims(np.array(valid_circles), axis=0)
+            print(f"Number of valid circles detected: {len(valid_circles[0])}")
             return valid_circles
         else:
             print("No valid circles detected")
             return None
+        
     else:
         print("No circles detected")
         return None
 
-
-
 def watershed_segmentation(img):
     assert img is not None, "file could not be read, check with os.path.exists()"
 
-    # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Apply Otsu's thresholding to get a binary image
     ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    # Define a kernel for morphological operations
     kernel = np.ones((3, 3), np.uint8)
 
     # Perform morphological opening to remove noise
@@ -55,14 +130,9 @@ def watershed_segmentation(img):
 
     # Dilate to obtain sure background
     sure_bg = cv2.dilate(opening, kernel, iterations=3)
-
-    # Ensure output is binary: 0 or 255
     sure_bg_binary = cv2.threshold(sure_bg, 127, 255, cv2.THRESH_BINARY)[1]
 
     return sure_bg_binary
-
-
-   
 
 def calculate_precision(image, center, radius):
     if image is None:
@@ -93,19 +163,15 @@ def calculate_precision(image, center, radius):
     if total_circle_pixels == 0:
         return 0.0
     
-    # Ratio of black pixels to all pixels inside the circle
     ratio = black_pixel_count / total_circle_pixels
     return ratio
-
-
 
 def draw_circles(circles, image):
     if circles is None:
         return
     
     image_with_circles = image.copy()
-    image_tranformed = watershed_segmentation(image)
-
+    image_transformed = watershed_segmentation(image)
 
     for i in circles[0, :]:
         center = (i[0], i[1])
@@ -115,16 +181,31 @@ def draw_circles(circles, image):
         # Draw the circle's center and perimeter
         cv2.circle(image_with_circles, center, radius=10, color=(0, 0, 255), thickness=-1)
         cv2.circle(image_with_circles, center, radius, color=(0, 255, 0), thickness=3)
-        
-    
-    # Display the image with all circles
-    cv2.imshow("Transformed Image", image_tranformed)
-    cv2.imshow("Circles Detected", image_with_circles)
-    cv2.waitKey(0) 
-    cv2.destroyAllWindows()
+
+    # Convert images from BGR to RGB for displaying with matplotlib
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image_with_circles_rgb = cv2.cvtColor(image_with_circles, cv2.COLOR_BGR2RGB)
+    image_transformed_rgb = cv2.cvtColor(image_transformed, cv2.COLOR_GRAY2RGB)
+
+    # Display the original image, the transformed image, and the image with detected circles
+    plt.figure(figsize=(15, 5))
+
+    plt.subplot(1, 3, 1)
+    plt.imshow(image_rgb)
+    plt.title("Original Image")
+
+    plt.subplot(1, 3, 2)
+    plt.imshow(image_transformed_rgb)
+    plt.title("Transformed Image")
+
+    plt.subplot(1, 3, 3)
+    plt.imshow(image_with_circles_rgb)
+    plt.title("Circles Detected")
+
+    plt.show()
 
 min_precision = 0.05
-image = cv2.imread('test_images/7.png', cv2.IMREAD_COLOR)
+image = cv2.imread('test_images/11.png', cv2.IMREAD_COLOR)
 
 circles = find_circles(watershed_segmentation(image))
 
