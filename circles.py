@@ -142,25 +142,28 @@ def calculate_precision(image, center, radius):
         image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     height, width = image_gray.shape
-    if center[0] < 0 or center[0] >= width or center[1] < 0 or center[1] >= height:
-        return 0
-    center = (int(center[0]), int(center[1]))
+    center_x, center_y = int(center[0]), int(center[1])
     radius = int(radius)
 
     Y, X = np.ogrid[:height, :width]
-    dist_from_center = np.sqrt((X - center[0])**2 + (Y - center[1])**2)
+    dist_from_center = np.sqrt((X - center_x) ** 2 + (Y - center_y) ** 2)
     circle_mask = dist_from_center <= radius
 
-    circle_pixels = image_gray[circle_mask]
+    valid_mask = (X - center_x >= -radius) & (X - center_x <= radius) & \
+                 (Y - center_y >= -radius) & (Y - center_y <= radius)
+
+    combined_mask = circle_mask & valid_mask
+
+    circle_pixels = image_gray[combined_mask]
 
     black_pixel_count = np.sum(circle_pixels == 0)
-    total_circle_pixels = len(circle_pixels)
+    total_circle_pixels = np.sum(circle_mask)
 
-    if total_circle_pixels == 0:
-        return 0.0
-    
+    total_circle_pixels = total_circle_pixels if total_circle_pixels > 0 else 1
+
     ratio = black_pixel_count / total_circle_pixels
     return ratio
+
 
 def draw_circles(circles, image):
     if circles is None:
@@ -198,7 +201,7 @@ def draw_circles(circles, image):
     plt.show()
 
 min_precision = 0.05
-image = cv2.imread('test_images/13.png', cv2.IMREAD_COLOR)
+image = cv2.imread('test_images/10.png', cv2.IMREAD_COLOR)
 
 circles = find_circles(watershed_segmentation(image))
 
