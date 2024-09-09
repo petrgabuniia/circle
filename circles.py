@@ -79,59 +79,6 @@ def remove_intersecting_circles(circles):
     
     return np.expand_dims(np.array(circles), axis=0)
 
-def find_circles(image):
-    if image is None:
-        print("Failed to load image")
-        return None
-    
-    if len(image.shape) == 2:
-        gray = image
-    else:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=75, param1=20, param2=15, minRadius=10, maxRadius=2000)
-    
-    if circles is not None:
-        circles = np.uint16(np.around(circles))
-        valid_circles = []
-
-        for i in circles[0, :]:
-            precision = calculate_precision(image, (i[0], i[1]), i[2])
-            if precision < min_precision:
-                valid_circles.append(i)
-            print(f"Circle at ({i[0]}, {i[1]}) with radius {i[2]} has precision: {precision:.2f}%")
-        
-        if len(valid_circles) > 0:
-            valid_circles = np.expand_dims(np.array(valid_circles), axis=0)
-            print(f"Number of valid circles detected: {len(valid_circles[0])}")
-            
-            # Remove intersecting circles here
-            valid_circles = remove_intersecting_circles(valid_circles)
-            print(f"Number of circles after removing intersections: {len(valid_circles[0])}")
-            
-            return valid_circles
-        else:
-            print("No valid circles detected")
-            return None
-    else:
-        print("No circles detected")
-        return None
-
-def watershed_segmentation(img):
-    assert img is not None, "file could not be read, check with os.path.exists()"
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    kernel = np.ones((3, 3), np.uint8)
-
-    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
-
-    sure_bg = cv2.dilate(opening, kernel, iterations=3)
-    sure_bg_binary = cv2.threshold(sure_bg, 127, 255, cv2.THRESH_BINARY)[1]
-
-    return sure_bg_binary
-
 def calculate_precision(image, center, radius):
     if image is None:
         raise ValueError("Image not found or path is incorrect")
@@ -164,6 +111,101 @@ def calculate_precision(image, center, radius):
     ratio = black_pixel_count / total_circle_pixels
     return ratio
 
+def refine_circle(image, circle, step_size=1, max_shift=5, max_radius_change=10):
+    center = (int(circle[0]), int(circle[1]))
+    radius = int(circle[2])
+    
+    best_center = center
+    best_radius = radius
+    best_precision = calculate_precision(image, center, radius)
+
+    # Try shifting the center slightly in all directions
+    for dx in range(-max_shift, max_shift + 1, step_size):
+        for dy in range(-max_shift, max_shift + 1, step_size):
+            new_center = (center[0] + dx, center[1] + dy)
+            new_precision = calculate_precision(image, new_center, radius)
+
+            # Update the best center if precision improves
+            if new_precision < best_precision and new_precision < min_precision:
+                best_center = new_center
+                best_precision = new_precision
+
+    for i in range(1, max_radius_change + 1):
+        new_radius = radius - i
+        if new_radius <= 0:
+            break  # Stop if the radius becomes invalid
+
+        precision = calculate_precision(image, best_center, new_radius)
+        if precision < best_precision and precision < min_precision:
+            best_radius = new_radius
+            best_precision = precision
+
+    for i in range(1, max_radius_change + 1):
+        new_radius = radius + i
+        precision = calculate_precision(image, best_center, new_radius)
+
+        if precision <= best_precision and precision < min_precision:
+            best_radius = new_radius
+            best_precision = precision
+
+    return (best_center[0], best_center[1], best_radius)
+
+
+
+def find_circles(image):
+    if image is None:
+        print("Failed to load image")
+        return None
+    
+    if len(image.shape) == 2:
+        gray = image
+    else:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=75, param1=20, param2=15, minRadius=5, maxRadius=2000)
+    
+    if circles is not None:
+        circles = np.uint16(np.around(circles))
+        valid_circles = []
+
+        for i in circles[0, :]:
+            precision = calculate_precision(image, (i[0], i[1]), i[2])
+            if precision < min_precision:
+                refined_circle = refine_circle(image, i)
+                valid_circles.append(refined_circle)
+            print(f"Circle at ({i[0]}, {i[1]}) with radius {i[2]} has precision: {precision:.2f}%")
+        
+        if len(valid_circles) > 0:
+            valid_circles = np.expand_dims(np.array(valid_circles), axis=0)
+            print(f"Number of valid circles detected: {len(valid_circles[0])}")
+            
+            valid_circles = remove_intersecting_circles(valid_circles)
+            print(f"Number of circles after removing intersections: {len(valid_circles[0])}")
+            
+            return valid_circles
+        else:
+            print("No valid circles detected")
+            return None
+    else:
+        print("No circles detected")
+        return None
+
+
+
+def watershed_segmentation(img):
+    assert img is not None, "file could not be read, check with os.path.exists()"
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    kernel = np.ones((3, 3), np.uint8)
+
+    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
+
+    sure_bg = cv2.dilate(opening, kernel, iterations=3)
+    sure_bg_binary = cv2.threshold(sure_bg, 127, 255, cv2.THRESH_BINARY)[1]
+
+    return sure_bg_binary
 
 def draw_circles(circles, image):
     if circles is None:
@@ -175,7 +217,7 @@ def draw_circles(circles, image):
     for i in circles[0, :]:
         center = (i[0], i[1])
         radius = i[2]
-        print("center : ", center, "radius: ", radius)
+        print("center : ", center, "radius: ", radius, "precision: ", calculate_precision(image, center, radius))
         
         cv2.circle(image_with_circles, center, radius=10, color=(0, 0, 255), thickness=-1)
         cv2.circle(image_with_circles, center, radius, color=(0, 255, 0), thickness=3)
@@ -191,18 +233,19 @@ def draw_circles(circles, image):
     plt.title("Original Image")
 
     plt.subplot(1, 3, 2)
+    plt.imshow(image_with_circles_rgb)
+    plt.title("Detected Circles")
+
+    plt.subplot(1, 3, 3)
     plt.imshow(image_transformed_rgb)
     plt.title("Transformed Image")
 
-    plt.subplot(1, 3, 3)
-    plt.imshow(image_with_circles_rgb)
-    plt.title("Circles Detected")
-
     plt.show()
 
-min_precision = 0.05
-image = cv2.imread('test_images/10.png', cv2.IMREAD_COLOR)
+if __name__ == "__main__":
+    min_precision = 0.05
+    image = cv2.imread("test_images/9.png")
+    circles = find_circles(watershed_segmentation(image))
 
-circles = find_circles(watershed_segmentation(image))
-
-draw_circles(circles, image)
+    if circles is not None:
+        draw_circles(circles, image)
