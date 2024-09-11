@@ -130,7 +130,7 @@ def find_circles(image):
         gray = image
     else:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=75, param1=20, param2=15, minRadius=5, maxRadius=2000)
+    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=75, param1=20, param2=15, minRadius=10, maxRadius=2000)
     if circles is not None:
         circles = np.uint16(np.around(circles))
         valid_circles = []
@@ -139,13 +139,16 @@ def find_circles(image):
             if precision < min_precision:
                 refined_circle = refine_circle(image, i)
                 valid_circles.append(refined_circle)
-            print(f"Circle at ({i[0]}, {i[1]}) with radius {i[2]} has precision: {precision:.2f}%")
+            #print(f"Circle at ({i[0]}, {i[1]}) with radius {i[2]} has precision: {precision:.2f}%")
         if len(valid_circles) > 0:
             valid_circles = np.expand_dims(np.array(valid_circles), axis=0)
             print(f"Number of valid circles detected: {len(valid_circles[0])}")
             valid_circles = remove_intersecting_circles(valid_circles)
             print(f"Number of circles after removing intersections: {len(valid_circles[0])}")
+            for circle in valid_circles[0]:
+                print(f"Circle at ({circle[0]}, {circle[1]}) with radius {circle[2]}")
             return valid_circles
+            
         else:
             print("No valid circles detected")
             return None
@@ -153,9 +156,15 @@ def find_circles(image):
         print("No circles detected")
         return None
 
-def watershed_segmentation(img, manual_thresh=100, adaptive_thresh=False):
-    assert img is not None, "file could not be read, check with os.path.exists()"
+
+
+def watershed_segmentation(img, manual_thresh, adaptive_thresh):
+    """
+    Performs watershed segmentation on an image and returns the segmented image.
+    """
+    assert img is not None, "File could not be read, check with os.path.exists()"
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
     if adaptive_thresh:
         thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                        cv2.THRESH_BINARY_INV, 11, 2)
@@ -164,15 +173,19 @@ def watershed_segmentation(img, manual_thresh=100, adaptive_thresh=False):
             ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         else:
             ret, thresh = cv2.threshold(gray, manual_thresh, 255, cv2.THRESH_BINARY_INV)
-    
+
     kernel = np.ones((3, 3), np.uint8)
     opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
     sure_bg = cv2.dilate(opening, kernel, iterations=3)
-    sure_bg_binary = cv2.threshold(sure_bg, 127, 255, cv2.THRESH_BINARY)[1]
-    
-    return sure_bg_binary
 
-def draw_circles(circles, image):
+    sure_bg_bgr = cv2.cvtColor(sure_bg, cv2.COLOR_GRAY2BGR)
+
+    return sure_bg_bgr
+
+def draw_circles(circles, image, color=(0, 255, 0)):
+    """
+    Draws circles on the given image. The default color is green, but you can pass in another color.
+    """
     global show_circles
 
     if circles is None:
@@ -183,16 +196,19 @@ def draw_circles(circles, image):
         center = (i[0], i[1])
         radius = i[2]
         if show_circles:
-            cv2.circle(image_with_circles, center, radius, color=(0, 255, 0), thickness=1)
+            cv2.circle(image_with_circles, center, radius, color=color, thickness=2)
             cv2.circle(image_with_circles, center, radius=10, color=(0, 0, 255), thickness=-1)
 
     return image_with_circles
 
 def create_matplotlib_window():
-    global fig, ax, canvas
+    global fig, ax_original, ax_segmented, canvas
 
     fig = Figure(figsize=(10, 6))
-    ax = fig.add_subplot(111)
+    
+    ax_original = fig.add_subplot(121)
+    ax_segmented = fig.add_subplot(122)
+    
     canvas = FigureCanvasTkAgg(fig, master=frame)
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
@@ -201,30 +217,38 @@ def create_matplotlib_window():
     toolbar.update()
     toolbar.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-    ax.set_title("Matplotlib Plot with Toolbar")
+    ax_original.set_title("Original Image with Circles")
+    ax_segmented.set_title("Watershed Image with Circles (in color)")
 
 def toggle_circles():
     global show_circles
     show_circles = not show_circles
 
     if circles is not None:
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
+        xlim_original = ax_original.get_xlim()
+        ylim_original = ax_original.get_ylim()
+        xlim_segmented = ax_segmented.get_xlim()
+        ylim_segmented = ax_segmented.get_ylim()
 
         img_with_circles = draw_circles(circles, image)
-        ax.clear()
-        ax.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+        ax_original.clear()
+        ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+        ax_original.set_xlim(xlim_original)
+        ax_original.set_ylim(ylim_original)
 
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
+        img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 0, 255))
+        ax_segmented.clear()
+        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        ax_segmented.set_xlim(xlim_segmented)
+        ax_segmented.set_ylim(ylim_segmented)
 
         canvas.draw()
-
 
 if __name__ == "__main__":
     min_precision = 0.05
     image = cv2.imread("test_images/10.png")
-    segmented_image = watershed_segmentation(image)
+    
+    segmented_image = watershed_segmentation(image, manual_thresh=85, adaptive_thresh=False)
     circles = find_circles(segmented_image)
 
     root = tk.Tk()
@@ -237,7 +261,11 @@ if __name__ == "__main__":
 
     if circles is not None:
         img_with_circles = draw_circles(circles, image)
-        ax.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+        img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
+        
+        ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+        
+        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
 
     toggle_button = Button(root, text="Show/Hide", command=toggle_circles)
     toggle_button.pack(side=tk.BOTTOM)
