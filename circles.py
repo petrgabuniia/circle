@@ -153,14 +153,23 @@ def find_circles(image):
         print("No circles detected")
         return None
 
-def watershed_segmentation(img):
+def watershed_segmentation(img, manual_thresh=100, adaptive_thresh=False):
     assert img is not None, "file could not be read, check with os.path.exists()"
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    if adaptive_thresh:
+        thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                       cv2.THRESH_BINARY_INV, 11, 2)
+    else:
+        if manual_thresh is None:
+            ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        else:
+            ret, thresh = cv2.threshold(gray, manual_thresh, 255, cv2.THRESH_BINARY_INV)
+    
     kernel = np.ones((3, 3), np.uint8)
     opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
     sure_bg = cv2.dilate(opening, kernel, iterations=3)
     sure_bg_binary = cv2.threshold(sure_bg, 127, 255, cv2.THRESH_BINARY)[1]
+    
     return sure_bg_binary
 
 def draw_circles(circles, image):
@@ -174,7 +183,7 @@ def draw_circles(circles, image):
         center = (i[0], i[1])
         radius = i[2]
         if show_circles:
-            cv2.circle(image_with_circles, center, radius, color=(0, 255, 0), thickness=2)
+            cv2.circle(image_with_circles, center, radius, color=(0, 255, 0), thickness=1)
             cv2.circle(image_with_circles, center, radius=10, color=(0, 0, 255), thickness=-1)
 
     return image_with_circles
