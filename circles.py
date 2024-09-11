@@ -197,11 +197,20 @@ def create_matplotlib_window():
 def toggle_circles():
     global show_circles
     show_circles = not show_circles
+
     if circles is not None:
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+
         img_with_circles = draw_circles(circles, image)
         ax.clear()
         ax.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+
         canvas.draw()
+
 
 if __name__ == "__main__":
     min_precision = 0.05
