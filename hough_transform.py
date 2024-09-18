@@ -1,41 +1,38 @@
-import cv2 as cv
+import cv2 as cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
 # Load the image
-img = cv.imread('test_images/12.png')
-assert img is not None, "file could not be read, check with os.path.exists()"
+img = cv2.imread('test_images/12.png')
 
-gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+def watershed_segmentation(img, manual_thresh=100, adaptive_thresh=False):
+    assert img is not None, "file could not be read, check with os.path.exists()"
+    
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    if adaptive_thresh:
+        # Adaptive thresholding to handle varying lighting conditions
+        thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                       cv2.THRESH_BINARY_INV, 11, 2)
+    else:
+        # Manual thresholding (default uses Otsu if manual_thresh is not provided)
+        if manual_thresh is None:
+            ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        else:
+            ret, thresh = cv2.threshold(gray, manual_thresh, 255, cv2.THRESH_BINARY_INV)
+    
+    # Morphological operations to clean up noise
+    kernel = np.ones((3, 3), np.uint8)
+    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
+    
+    # Sure background (dilated regions)
+    sure_bg = cv2.dilate(opening, kernel, iterations=3)
+    
+    # Optional: Convert sure background to binary again
+    sure_bg_binary = cv2.threshold(sure_bg, 127, 255, cv2.THRESH_BINARY)[1]
+    
+    return sure_bg_binary
 
-# Apply Otsu's binarization
-ret, thresh = cv.threshold(gray, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
-
-
-kernel = np.ones((3,3), np.uint8)
-opening = cv.morphologyEx(thresh, cv.MORPH_OPEN, kernel, iterations=2)
-sure_bg = cv.dilate(opening, kernel, iterations=3)
-dist_transform = cv.distanceTransform(opening, cv.DIST_L2, 5)
-ret, sure_fg = cv.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
-sure_fg = np.uint8(sure_fg)
-unknown = cv.subtract(sure_bg, sure_fg)
-ret, markers = cv.connectedComponents(sure_fg)
-markers = markers + 1
-markers[unknown == 255] = 0
-
-
-markers = cv.watershed(img, markers)
-
-
-img[markers == -1] = [255, 0, 0]
-
-
-plt.figure(figsize=(12, 12))
-plt.subplot(231), plt.imshow(gray, cmap='gray'), plt.title('Grayscale Image')
-plt.subplot(232), plt.imshow(thresh, cmap='gray'), plt.title('Thresholded Image')
-plt.subplot(233), plt.imshow(sure_bg, cmap='gray'), plt.title('Sure Background')
-plt.subplot(234), plt.imshow(dist_transform, cmap='gray'), plt.title('Distance Transform')
-plt.subplot(235), plt.imshow(sure_fg, cmap='gray'), plt.title('Sure Foreground')
-plt.subplot(236), plt.imshow(cv.cvtColor(img, cv.COLOR_BGR2RGB)), plt.title('Segmented Image')
-
+# Display the result
+plt.imshow(watershed_segmentation(img), cmap='gray')
 plt.show()

@@ -153,8 +153,6 @@ def enhanced_segmentation(img):
         # Draw the contour
         cv2.drawContours(filled_shapes, [contour], -1, color, thickness=cv2.FILLED)
         
-        # Print debug information
-        print(f"Contour {i}: Area = {cv2.contourArea(contour)}, Has Children = {has_children}, Color = {'White' if color == 255 else 'Black'}")
     
     return filled_shapes
 
