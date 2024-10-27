@@ -196,7 +196,7 @@ def draw_circles(circles, image, color=(0, 255, 0)):
         center = (i[0], i[1])
         radius = i[2]
         if show_circles:
-            cv2.circle(image_with_circles, center, radius, color=color, thickness=2)
+            cv2.circle(image_with_circles, center, radius, color=color, thickness=1)
             cv2.circle(image_with_circles, center, radius=10, color=(0, 0, 255), thickness=-1)
 
     return image_with_circles
@@ -246,9 +246,9 @@ def toggle_circles():
 
 if __name__ == "__main__":
     min_precision = 0.05
-    image = cv2.imread("test_images/10.png")
+    image = cv2.imread("test_images/20.png")
     
-    segmented_image = watershed_segmentation(image, manual_thresh=85, adaptive_thresh=False)
+    segmented_image = watershed_segmentation(image, manual_thresh=150, adaptive_thresh=False) # lessen tresh for less circles
     circles = find_circles(segmented_image)
 
     root = tk.Tk()
@@ -271,3 +271,6 @@ if __name__ == "__main__":
     toggle_button.pack(side=tk.BOTTOM)
 
     root.mainloop()
+
+# TODO add print to visualization window
+# TODO adjust parameter automatically
