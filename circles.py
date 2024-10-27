@@ -201,13 +201,14 @@ def draw_circles(circles, image, color=(0, 255, 0)):
 
     return image_with_circles
 
-def create_matplotlib_window():
-    global fig, ax_original, ax_segmented, canvas
+def create_matplotlib_window(valid_circles):
+    global fig, ax_original, ax_segmented, ax_border, canvas
 
     fig = Figure(figsize=(10, 6))
     
-    ax_original = fig.add_subplot(121)
-    ax_segmented = fig.add_subplot(122)
+    ax_original = fig.add_subplot(131)
+    ax_segmented = fig.add_subplot(132)
+    ax_border = fig.add_subplot(133)
     
     canvas = FigureCanvasTkAgg(fig, master=frame)
     canvas.draw()
@@ -219,6 +220,10 @@ def create_matplotlib_window():
 
     ax_original.set_title("Original Image with Circles")
     ax_segmented.set_title("Watershed Image with Circles (in color)")
+    ax_border.set_title("Border Image")
+    circle_details = "\n".join([f"Circle at ({circle[0]}, {circle[1]}) with radius {circle[2]}" for circle in valid_circles[0]])
+
+    fig.text(0.5, 0.02, circle_details, ha='center', fontsize=10)
 
 def toggle_circles():
     global show_circles
@@ -246,31 +251,33 @@ def toggle_circles():
 
 if __name__ == "__main__":
     min_precision = 0.05
-    image = cv2.imread("test_images/20.png")
+    name = "FLW_DARK_0067.png"
+    image = cv2.imread("test_images/" + name)
     
-    segmented_image = watershed_segmentation(image, manual_thresh=150, adaptive_thresh=False) # lessen tresh for less circles
+    segmented_image = watershed_segmentation(image, manual_thresh=25, adaptive_thresh=False) # lessen tresh for less circles
     circles = find_circles(segmented_image)
 
     root = tk.Tk()
-    root.title("Matplotlib with Toolbar and Circle Toggle")
+    root.title(name)
 
     frame = tk.Frame(root)
     frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
 
-    create_matplotlib_window()
+    create_matplotlib_window(circles)
 
     if circles is not None:
         img_with_circles = draw_circles(circles, image)
         img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
         
         ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
-        
         ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        ax_border.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
 
     toggle_button = Button(root, text="Show/Hide", command=toggle_circles)
     toggle_button.pack(side=tk.BOTTOM)
 
     root.mainloop()
+
 
 # TODO add print to visualization window
 # TODO adjust parameter automatically
