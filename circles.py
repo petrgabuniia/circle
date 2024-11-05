@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import Button
+from tkinter import Button, filedialog
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
@@ -256,10 +256,22 @@ def toggle_circles():
 
         canvas.draw()
 
+def select_image():
+    global image, segmented_image, circles
+
+    file_path = filedialog.askopenfilename()
+    if file_path:
+        return file_path
+    
+
 if __name__ == "__main__":
     min_precision = 0.05
-    sensor_name = "FLW_LIGHT_0066"
-    image = cv2.imread("test_images/" + sensor_name + ".png")
+
+    path = select_image()
+    sensor_name = path.split("/")[-1].split(".")[0]
+    print   (sensor_name)
+    image = cv2.imread(path)
+    
     
     segmented_image = watershed_segmentation(image, manual_thresh=60, adaptive_thresh=False) # lessen tresh for less circles or smaller radius
     circles = find_circles(segmented_image)
@@ -270,7 +282,7 @@ if __name__ == "__main__":
     frame = tk.Frame(root)
     frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
 
-    create_matplotlib_window(circles, sensor_name)
+    create_matplotlib_window(circles, path)
 
     if circles is not None:
         img_with_circles = draw_circles(circles, image)
@@ -279,7 +291,7 @@ if __name__ == "__main__":
         ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
         # ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
         pdf_file = sensor_name + ".pdf"
-        fig.savefig(pdf_file, format='pdf')
+        fig.savefig(pdf_file, format='pdf', dpi = 1000)
         
 
     toggle_button = Button(root, text="Show/Hide", command=toggle_circles)
