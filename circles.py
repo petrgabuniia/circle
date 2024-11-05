@@ -5,6 +5,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+from datetime import datetime
 
 # Global variables
 show_circles = True
@@ -201,13 +202,13 @@ def draw_circles(circles, image, color=(0, 255, 0)):
 
     return image_with_circles
 
-def create_matplotlib_window(valid_circles):
+def create_matplotlib_window(valid_circles, name):
     global fig, ax_original, ax_segmented, ax_border, canvas
 
     fig = Figure(figsize=(10, 6))
     
-    ax_original = fig.add_subplot(121)
-    ax_segmented = fig.add_subplot(122)
+    ax_original = fig.add_subplot(111)
+    # ax_segmented = fig.add_subplot(122)
     
     canvas = FigureCanvasTkAgg(fig, master=frame)
     canvas.draw()
@@ -216,12 +217,18 @@ def create_matplotlib_window(valid_circles):
     toolbar = NavigationToolbar2Tk(canvas, frame)
     toolbar.update()
     toolbar.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    ax_original.set_title("Original Image with Circles")
-    ax_segmented.set_title("Watershed Image with Circles (in color)")
+
+    # ax_original.set_title("Original Image with Circles")
+    # ax_segmented.set_title("Watershed Image with Circles (in color)")
     circle_details = "\n".join([f"Circle at ({circle[0]}, {circle[1]}) with radius {circle[2]}" for circle in valid_circles[0]])
+    fig.subplots_adjust(bottom=0.4) 
+    fig.text(0.5, 0.95, sensor_name, ha='center', fontsize=12)
+    fig.text(0.5, 0.1, circle_details, ha='center', fontsize=10)
+    fig.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic')
 
-    fig.text(0.5, 0.02, circle_details, ha='center', fontsize=10)
+    
 
 def toggle_circles():
     global show_circles
@@ -241,36 +248,39 @@ def toggle_circles():
         ax_original.set_title("Original Image with Circles")
 
         img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 0, 255))
-        ax_segmented.clear()
-        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
-        ax_segmented.set_xlim(xlim_segmented)
-        ax_segmented.set_ylim(ylim_segmented)
-        ax_segmented.set_title("Watershed Image with Circles (in color)")
+        # ax_segmented.clear()
+        # ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        # ax_segmented.set_xlim(xlim_segmented)
+        # ax_segmented.set_ylim(ylim_segmented)
+        # ax_segmented.set_title("Watershed Image with Circles (in color)")
 
         canvas.draw()
 
 if __name__ == "__main__":
     min_precision = 0.05
-    name = "FLW_LIGHT_0066"
-    image = cv2.imread("test_images/" + name + ".png")
+    sensor_name = "FLW_LIGHT_0066"
+    image = cv2.imread("test_images/" + sensor_name + ".png")
     
     segmented_image = watershed_segmentation(image, manual_thresh=60, adaptive_thresh=False) # lessen tresh for less circles or smaller radius
     circles = find_circles(segmented_image)
 
     root = tk.Tk()
-    root.title(name)
+    root.title(sensor_name)
 
     frame = tk.Frame(root)
     frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
 
-    create_matplotlib_window(circles)
+    create_matplotlib_window(circles, sensor_name)
 
     if circles is not None:
         img_with_circles = draw_circles(circles, image)
         img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
         
         ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
-        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        # ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        pdf_file = sensor_name + ".pdf"
+        fig.savefig(pdf_file, format='pdf')
+        
 
     toggle_button = Button(root, text="Show/Hide", command=toggle_circles)
     toggle_button.pack(side=tk.BOTTOM)
@@ -278,5 +288,3 @@ if __name__ == "__main__":
     root.mainloop()
 
 
-# TODO add print to visualization window
-# TODO adjust parameter automatically
