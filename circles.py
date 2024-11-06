@@ -203,14 +203,17 @@ def draw_circles(circles, image, color=(0, 255, 0)):
     return image_with_circles
 
 def create_matplotlib_window(valid_circles, name):
-    global fig, ax_original, ax_segmented, ax_border, canvas
+    global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, ax_border, canvas
 
-    fig = Figure(figsize=(10, 6))
+    fig_to_show = Figure(figsize=(10, 6))
+    fig_to_save = Figure(figsize=(10, 6))
+
     
-    ax_original = fig.add_subplot(111)
-    # ax_segmented = fig.add_subplot(122)
+    ax_original = fig_to_show.add_subplot(121)
+    ax_segmented = fig_to_show.add_subplot(122)
+    ax_tosave = fig_to_save.add_subplot(111)
     
-    canvas = FigureCanvasTkAgg(fig, master=frame)
+    canvas = FigureCanvasTkAgg(fig_to_show, master=frame)
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
@@ -220,13 +223,19 @@ def create_matplotlib_window(valid_circles, name):
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-    # ax_original.set_title("Original Image with Circles")
-    # ax_segmented.set_title("Watershed Image with Circles (in color)")
+    ax_original.set_title("Original Image with Circles")
+    ax_tosave.set_title("Original Image with Circles")
+    ax_segmented.set_title("Watershed Image with Circles (in color)")
     circle_details = "\n".join([f"Circle at ({circle[0]}, {circle[1]}) with radius {circle[2]}" for circle in valid_circles[0]])
-    fig.subplots_adjust(bottom=0.4) 
-    fig.text(0.5, 0.95, sensor_name, ha='center', fontsize=12)
-    fig.text(0.5, 0.1, circle_details, ha='center', fontsize=10)
-    fig.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic')
+    fig_to_show.subplots_adjust(bottom=0.4) 
+    fig_to_show.text(0.5, 0.95, sensor_name, ha='center', fontsize=12)
+    fig_to_show.text(0.5, 0.1, circle_details, ha='center', fontsize=10)
+    fig_to_show.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic')
+
+    fig_to_save.subplots_adjust(bottom=0.4)
+    fig_to_save.text(0.5, 0.95, sensor_name, ha='center', fontsize=12)
+    fig_to_save.text(0.5, 0.1, circle_details, ha='center', fontsize=10)
+    fig_to_save.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic')  
 
     
 
@@ -247,12 +256,18 @@ def toggle_circles():
         ax_original.set_ylim(ylim_original)
         ax_original.set_title("Original Image with Circles")
 
+        ax_tosave.clear()
+        ax_tosave.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+        ax_tosave.set_xlim(xlim_original)
+        ax_tosave.set_ylim(ylim_original)
+        ax_tosave.set_title("Original Image with Circles")
+
         img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 0, 255))
-        # ax_segmented.clear()
-        # ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
-        # ax_segmented.set_xlim(xlim_segmented)
-        # ax_segmented.set_ylim(ylim_segmented)
-        # ax_segmented.set_title("Watershed Image with Circles (in color)")
+        ax_segmented.clear()
+        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        ax_segmented.set_xlim(xlim_segmented)
+        ax_segmented.set_ylim(ylim_segmented)
+        ax_segmented.set_title("Watershed Image with Circles (in color)")
 
         canvas.draw()
 
@@ -286,12 +301,14 @@ if __name__ == "__main__":
 
     if circles is not None:
         img_with_circles = draw_circles(circles, image)
+        img_tosave = draw_circles(circles, image)
         img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
         
         ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
-        # ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        ax_tosave.imshow(cv2.cvtColor(img_tosave, cv2.COLOR_BGR2RGB))
+        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
         pdf_file = sensor_name + ".pdf"
-        fig.savefig(pdf_file, format='pdf', dpi = 1000)
+        fig_to_save.savefig(pdf_file, format='pdf', dpi = 1000)
         
 
     toggle_button = Button(root, text="Show/Hide", command=toggle_circles)
