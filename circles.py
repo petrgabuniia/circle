@@ -14,6 +14,7 @@ image, segmented_image, circles = None, None, None
 min_precision = 0.05
 sensor_name = "Sensor Name"
 circle_text_handle = None
+general_text_handle = None
 
 
 def calculate_intersection_area(circle1, circle2):
@@ -261,15 +262,28 @@ def create_matplotlib_window():
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     fig_to_show.subplots_adjust(bottom=0.4)
     fig_to_save.subplots_adjust(bottom=0.4)
-    update_circle_text("No circles detected", current_time)  # Initialize with no circles
+    update_circle_text(current_time)  # Initialize with no circles
 
-def update_circle_text(circle_details, current_time):
+def update_circle_text(circle_details):
     global circle_text_handle, fig_to_show, fig_to_save
+    # Remove existing circle detail text
     if circle_text_handle is not None:
-        circle_text_handle.remove()  # Remove the previous text to avoid overlap
-    circle_text_handle = fig_to_show.text(0.5, 0.1, circle_details, ha='center', fontsize=10, transform=fig_to_show.transFigure)
-    fig_to_show.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure)
-    fig_to_save.text(0.5, 0.1, circle_details, ha='center', fontsize=10, transform=fig_to_save.transFigure)
+        for text in circle_text_handle:
+            text.remove()
+    # Set new circle detail text
+    circle_text_handle = [
+        fig_to_show.text(0.5, 0.1, circle_details, ha='center', fontsize=10, transform=fig_to_show.transFigure),
+        fig_to_save.text(0.5, 0.1, circle_details, ha='center', fontsize=10, transform=fig_to_save.transFigure)
+    ]
+    canvas.draw()
+
+def update_general_info(current_time):
+    global general_text_handle, fig_to_show, fig_to_save
+    # Remove existing general info text
+    if general_text_handle is not None:
+        general_text_handle.remove()
+    # Set new general info text
+    general_text_handle = fig_to_show.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure)
     fig_to_save.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_save.transFigure)
     canvas.draw()
 
@@ -280,15 +294,17 @@ def display_images():
         img_with_circles = draw_circles(circles, image)
         img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
         circle_details = "\n".join([f"Circle at ({circle[0]}, {circle[1]}) with radius {circle[2]}" for circle in circles[0]])
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        update_circle_text(circle_details, current_time)
     else:
-        update_circle_text("No circles detected", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        circle_details = "No circles detected"
+
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    update_circle_text(circle_details)
+    update_general_info(current_time)
 
     ax_original.clear()
     ax_segmented.clear()
-    ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
-    ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+    ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB) if circles is not None and circles.any() else image)
+    ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB) if circles is not None and circles.any() else segmented_image)
     ax_original.set_title("Original Image with Circles")
     ax_segmented.set_title("Watershed Image with Circles (in color)")
 
