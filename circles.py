@@ -10,6 +10,9 @@ from datetime import datetime
 # Global variables
 show_circles = True
 fig, ax, canvas = None, None, None
+image, segmented_image, circles = None, None, None
+min_precision = 0.05
+
 
 def calculate_intersection_area(circle1, circle2):
     x1, y1, r1 = circle1
@@ -271,49 +274,80 @@ def toggle_circles():
 
         canvas.draw()
 
-def select_image():
-    global image, segmented_image, circles
+def create_matplotlib_window():
+    global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, ax_border, canvas, frame
+
+    fig_to_show = Figure(figsize=(10, 6))
+    fig_to_save = Figure(figsize=(10, 6))
+    ax_original = fig_to_show.add_subplot(121)
+    ax_segmented = fig_to_show.add_subplot(122)
+    ax_tosave = fig_to_save.add_subplot(111)
+
+    canvas = FigureCanvasTkAgg(fig_to_show, master=frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+    toolbar = NavigationToolbar2Tk(canvas, frame)
+    toolbar.update()
+    toolbar.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+def load_image():
+    global image, segmented_image, circles, sensor_name
 
     file_path = filedialog.askopenfilename()
     if file_path:
-        return file_path
-    
+        sensor_name = file_path.split("/")[-1].split(".")[0]
+        image = cv2.imread(file_path)
+        segmented_image = watershed_segmentation(image, manual_thresh=60, adaptive_thresh=False)
+        circles = find_circles(segmented_image)
+        display_images()
+
+def display_images():
+    global canvas, ax_original, ax_segmented
+
+    if circles is not None:
+        img_with_circles = draw_circles(circles, image)
+        img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
+
+        ax_original.clear()
+        ax_segmented.clear()
+
+        ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        ax_original.set_title("Original Image with Circles")
+        ax_segmented.set_title("Watershed Image with Circles (in color)")
+
+        canvas.draw()
+
+def generate_report():
+    global circles, fig_to_save
+
+    if circles is not None:
+        img_tosave = draw_circles(circles, image)
+        ax_tosave.clear()
+        ax_tosave.imshow(cv2.cvtColor(img_tosave, cv2.COLOR_BGR2RGB))
+        ax_tosave.set_title("Original Image with Circles")
+
+        pdf_file = sensor_name + ".pdf"
+        fig_to_save.savefig(pdf_file, format='pdf', dpi=1000)
+        print(f"Report saved as {pdf_file}")
 
 if __name__ == "__main__":
-    min_precision = 0.05
-
-    path = select_image()
-    sensor_name = path.split("/")[-1].split(".")[0]
-    print   (sensor_name)
-    image = cv2.imread(path)
-    
-    
-    segmented_image = watershed_segmentation(image, manual_thresh=60, adaptive_thresh=False) # lessen tresh for less circles or smaller radius
-    circles = find_circles(segmented_image)
-
     root = tk.Tk()
-    root.title(sensor_name)
+    root.title("Circle Detection Tool")
 
     frame = tk.Frame(root)
     frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
 
-    create_matplotlib_window(circles, path)
+    create_matplotlib_window()
 
-    if circles is not None:
-        img_with_circles = draw_circles(circles, image)
-        img_tosave = draw_circles(circles, image)
-        img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
-        
-        ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
-        ax_tosave.imshow(cv2.cvtColor(img_tosave, cv2.COLOR_BGR2RGB))
-        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
-        pdf_file = sensor_name + ".pdf"
-        fig_to_save.savefig(pdf_file, format='pdf', dpi = 1000)
-        
+    load_button = Button(root, text="Load Image", command=load_image)
+    load_button.pack(side=tk.BOTTOM)
+
+    save_button = Button(root, text="Generate Report", command=generate_report)
+    save_button.pack(side=tk.BOTTOM)
 
     toggle_button = Button(root, text="Show/Hide", command=toggle_circles)
     toggle_button.pack(side=tk.BOTTOM)
 
     root.mainloop()
-
-
