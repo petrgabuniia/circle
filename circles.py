@@ -26,42 +26,57 @@ standard_id_var = None
 unit_id_var = None
 
 def load_config():
-    config.read('data.ini')
+    global operator_name_var, standard_name_var, standard_id_var, unit_id_var
+    if not config.read('data.ini'):
+        create_config_section('Info')
+        config.set('Info', 'operator_name', "")
+        config.set('Info', 'standard_name', "")
+        config.set('Info', 'standard_id', "")
+        config.set('Info', 'unit_id', "")
+        save_config()
+
+    # Update StringVar fields with loaded values
+    operator_name_var.set(config.get('Info', 'operator_name', fallback=""))
+    standard_name_var.set(config.get('Info', 'standard_name', fallback=""))
+    standard_id_var.set(config.get('Info', 'standard_id', fallback=""))
+    unit_id_var.set(config.get('Info', 'unit_id', fallback=""))
+
+
 
 def save_config():
-    with open('data.ini', 'w') as configfile:
-        config.write(configfile)
+    try:
+        with open('data.ini', 'w') as configfile:
+            config.write(configfile)
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not save the configuration: {e}")
+
+
 
 def create_config_section(section):
     if not config.has_section(section):
         config.add_section(section)
 
 def setup_gui(root):
-    # Create left and right frames
     right_frame = tk.Frame(root)
     right_frame.pack(side=tk.RIGHT, fill=tk.Y, expand=False)
 
     left_frame = tk.Frame(root)
     left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-    # Initialize GUI components in their respective frames
     add_info_fields(right_frame)
     create_matplotlib_window(left_frame)
 
 def add_info_fields(main_frame):
     global operator_name_var, standard_name_var, standard_id_var, unit_id_var
 
-    # Create a subframe within the main frame to use grid manager
     frame = tk.Frame(main_frame)
-    frame.pack(fill=tk.BOTH, expand=True)  # Use pack for the subframe within the main frame
+    frame.pack(fill=tk.BOTH, expand=True)  
 
-    # Initialize the StringVars with default values or from the configuration
     operator_name_var = tk.StringVar(value=config.get('Info', 'operator_name') if config.has_option('Info', 'operator_name') else "")
     standard_name_var = tk.StringVar(value=config.get('Info', 'standard_name') if config.has_option('Info', 'standard_name') else "")
     standard_id_var = tk.StringVar(value=config.get('Info', 'standard_id') if config.has_option('Info', 'standard_id') else "")
     unit_id_var = tk.StringVar(value=config.get('Info', 'unit_id') if config.has_option('Info', 'unit_id') else "")
 
-    # Creating entry widgets and linking them with StringVars
     operator_entry = Entry(frame, textvariable=operator_name_var)
     operator_entry.grid(row=0, column=1, sticky='ew')
     Label(frame, text="Operator Name:").grid(row=0, column=0, sticky='w')
@@ -78,7 +93,6 @@ def add_info_fields(main_frame):
     unit_id_entry.grid(row=3, column=1, sticky='ew')
     Label(frame, text="Unit ID:").grid(row=3, column=0, sticky='w')
 
-    # Button to save the updates to the configuration file
     update_button = Button(frame, text="Update Info", command=update_info)
     update_button.grid(row=4, column=0, columnspan=2)
 
@@ -91,23 +105,40 @@ def add_info_fields(main_frame):
     toggle_button = tk.Button(frame, text="Show/Hide Circles", command=toggle_circles)
     toggle_button.grid(row=7, column=0, columnspan=2)
 
-    # Adjust the column configuration for better layout control
     frame.columnconfigure(0, weight=1)
     frame.columnconfigure(1, weight=3)
 
 def update_info():
     create_config_section('Info')
-    config.set('Info', 'operator_name', operator_name_var.get())
-    config.set('Info', 'standard_name', standard_name_var.get())
-    config.set('Info', 'standard_id', standard_id_var.get())
-    config.set('Info', 'unit_id', unit_id_var.get())
-    save_config()
-    display_images() 
 
-def create_config_section(section):
-    if not config.has_section(section):
-        config.add_section(section)
-    save_config()
+    changes_made = False
+
+    # Debug output for current values
+    print("Before update:", dict(config.items('Info')))
+
+    # Compare and update each field
+    if config.get('Info', 'operator_name', fallback='') != operator_name_var.get():
+        config.set('Info', 'operator_name', operator_name_var.get())
+        changes_made = True
+    if config.get('Info', 'standard_name', fallback='') != standard_name_var.get():
+        config.set('Info', 'standard_name', standard_name_var.get())
+        changes_made = True
+    if config.get('Info', 'standard_id', fallback='') != standard_id_var.get():
+        config.set('Info', 'standard_id', standard_id_var.get())
+        changes_made = True
+    if config.get('Info', 'unit_id', fallback='') != unit_id_var.get():
+        config.set('Info', 'unit_id', unit_id_var.get())
+        changes_made = True
+
+    # Save the configuration if changes were made
+    if changes_made:
+        save_config()
+        messagebox.showinfo("Update Info", "Information updated successfully.")
+    else:
+        save_config()
+        messagebox.showinfo("Update Info", "No changes detected, but configuration file has been ensured.")
+
+
 
 
 def calculate_intersection_area(circle1, circle2):
