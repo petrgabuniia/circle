@@ -12,6 +12,8 @@ show_circles = True
 fig, ax, canvas = None, None, None
 image, segmented_image, circles = None, None, None
 min_precision = 0.05
+sensor_name = "Sensor Name"
+circle_text_handle = None
 
 
 def calculate_intersection_area(circle1, circle2):
@@ -205,41 +207,6 @@ def draw_circles(circles, image, color=(0, 255, 0)):
 
     return image_with_circles
 
-def create_matplotlib_window(valid_circles, name):
-    global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, ax_border, canvas
-
-    fig_to_show = Figure(figsize=(10, 6))
-    fig_to_save = Figure(figsize=(10, 6))
-
-    
-    ax_original = fig_to_show.add_subplot(121)
-    ax_segmented = fig_to_show.add_subplot(122)
-    ax_tosave = fig_to_save.add_subplot(111)
-    
-    canvas = FigureCanvasTkAgg(fig_to_show, master=frame)
-    canvas.draw()
-    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-    toolbar = NavigationToolbar2Tk(canvas, frame)
-    toolbar.update()
-    toolbar.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-    ax_original.set_title("Original Image with Circles")
-    ax_tosave.set_title("Original Image with Circles")
-    ax_segmented.set_title("Watershed Image with Circles (in color)")
-    circle_details = "\n".join([f"Circle at ({circle[0]}, {circle[1]}) with radius {circle[2]}" for circle in valid_circles[0]])
-    fig_to_show.subplots_adjust(bottom=0.4) 
-    fig_to_show.text(0.5, 0.95, sensor_name, ha='center', fontsize=12)
-    fig_to_show.text(0.5, 0.1, circle_details, ha='center', fontsize=10)
-    fig_to_show.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic')
-
-    fig_to_save.subplots_adjust(bottom=0.4)
-    fig_to_save.text(0.5, 0.95, sensor_name, ha='center', fontsize=12)
-    fig_to_save.text(0.5, 0.1, circle_details, ha='center', fontsize=10)
-    fig_to_save.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic')  
-
     
 
 def toggle_circles():
@@ -275,7 +242,7 @@ def toggle_circles():
         canvas.draw()
 
 def create_matplotlib_window():
-    global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, ax_border, canvas, frame
+    global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, canvas, frame
 
     fig_to_show = Figure(figsize=(10, 6))
     fig_to_save = Figure(figsize=(10, 6))
@@ -291,6 +258,43 @@ def create_matplotlib_window():
     toolbar.update()
     toolbar.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fig_to_show.subplots_adjust(bottom=0.4)
+    fig_to_save.subplots_adjust(bottom=0.4)
+    update_circle_text("No circles detected", current_time)  # Initialize with no circles
+
+def update_circle_text(circle_details, current_time):
+    global circle_text_handle, fig_to_show, fig_to_save
+    if circle_text_handle is not None:
+        circle_text_handle.remove()  # Remove the previous text to avoid overlap
+    circle_text_handle = fig_to_show.text(0.5, 0.1, circle_details, ha='center', fontsize=10, transform=fig_to_show.transFigure)
+    fig_to_show.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure)
+    fig_to_save.text(0.5, 0.1, circle_details, ha='center', fontsize=10, transform=fig_to_save.transFigure)
+    fig_to_save.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_save.transFigure)
+    canvas.draw()
+
+def display_images():
+    global canvas, ax_original, ax_segmented, circles
+
+    if circles is not None and circles.any():
+        img_with_circles = draw_circles(circles, image)
+        img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
+        circle_details = "\n".join([f"Circle at ({circle[0]}, {circle[1]}) with radius {circle[2]}" for circle in circles[0]])
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        update_circle_text(circle_details, current_time)
+    else:
+        update_circle_text("No circles detected", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+    ax_original.clear()
+    ax_segmented.clear()
+    ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+    ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+    ax_original.set_title("Original Image with Circles")
+    ax_segmented.set_title("Watershed Image with Circles (in color)")
+
+    canvas.draw()
+
+
 def load_image():
     global image, segmented_image, circles, sensor_name
 
@@ -302,22 +306,6 @@ def load_image():
         circles = find_circles(segmented_image)
         display_images()
 
-def display_images():
-    global canvas, ax_original, ax_segmented
-
-    if circles is not None:
-        img_with_circles = draw_circles(circles, image)
-        img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
-
-        ax_original.clear()
-        ax_segmented.clear()
-
-        ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
-        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
-        ax_original.set_title("Original Image with Circles")
-        ax_segmented.set_title("Watershed Image with Circles (in color)")
-
-        canvas.draw()
 
 def generate_report():
     global circles, fig_to_save
