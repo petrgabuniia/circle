@@ -1,11 +1,15 @@
 import tkinter as tk
-from tkinter import Button, filedialog, messagebox
+from tkinter import Button, filedialog, messagebox, Entry, Label
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from datetime import datetime
+import configparser
+
+config = configparser.ConfigParser()
+
 
 # Global variables
 show_circles = True
@@ -15,6 +19,95 @@ min_precision = 0.05
 sensor_name = "Sensor Name"
 circle_text_handle = None
 general_text_handle = None
+
+operator_name_var = None
+standard_name_var = None
+standard_id_var = None
+unit_id_var = None
+
+def load_config():
+    config.read('data.ini')
+
+def save_config():
+    with open('data.ini', 'w') as configfile:
+        config.write(configfile)
+
+def create_config_section(section):
+    if not config.has_section(section):
+        config.add_section(section)
+
+def setup_gui(root):
+    # Create left and right frames
+    right_frame = tk.Frame(root)
+    right_frame.pack(side=tk.RIGHT, fill=tk.Y, expand=False)
+
+    left_frame = tk.Frame(root)
+    left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    # Initialize GUI components in their respective frames
+    add_info_fields(right_frame)
+    create_matplotlib_window(left_frame)
+
+def add_info_fields(main_frame):
+    global operator_name_var, standard_name_var, standard_id_var, unit_id_var
+
+    # Create a subframe within the main frame to use grid manager
+    frame = tk.Frame(main_frame)
+    frame.pack(fill=tk.BOTH, expand=True)  # Use pack for the subframe within the main frame
+
+    # Initialize the StringVars with default values or from the configuration
+    operator_name_var = tk.StringVar(value=config.get('Info', 'operator_name') if config.has_option('Info', 'operator_name') else "")
+    standard_name_var = tk.StringVar(value=config.get('Info', 'standard_name') if config.has_option('Info', 'standard_name') else "")
+    standard_id_var = tk.StringVar(value=config.get('Info', 'standard_id') if config.has_option('Info', 'standard_id') else "")
+    unit_id_var = tk.StringVar(value=config.get('Info', 'unit_id') if config.has_option('Info', 'unit_id') else "")
+
+    # Creating entry widgets and linking them with StringVars
+    operator_entry = Entry(frame, textvariable=operator_name_var)
+    operator_entry.grid(row=0, column=1, sticky='ew')
+    Label(frame, text="Operator Name:").grid(row=0, column=0, sticky='w')
+
+    standard_entry = Entry(frame, textvariable=standard_name_var)
+    standard_entry.grid(row=1, column=1, sticky='ew')
+    Label(frame, text="Standard Name:").grid(row=1, column=0, sticky='w')
+
+    standard_id_entry = Entry(frame, textvariable=standard_id_var)
+    standard_id_entry.grid(row=2, column=1, sticky='ew')
+    Label(frame, text="Standard ID:").grid(row=2, column=0, sticky='w')
+
+    unit_id_entry = Entry(frame, textvariable=unit_id_var)
+    unit_id_entry.grid(row=3, column=1, sticky='ew')
+    Label(frame, text="Unit ID:").grid(row=3, column=0, sticky='w')
+
+    # Button to save the updates to the configuration file
+    update_button = Button(frame, text="Update Info", command=update_info)
+    update_button.grid(row=4, column=0, columnspan=2)
+
+    load_button = tk.Button(frame, text="Load Image", command=load_image)
+    load_button.grid(row=5, column=0, columnspan=2)
+
+    save_button = tk.Button(frame, text="Generate Report", command=generate_report)
+    save_button.grid(row=6, column=0, columnspan=2)
+
+    toggle_button = tk.Button(frame, text="Show/Hide Circles", command=toggle_circles)
+    toggle_button.grid(row=7, column=0, columnspan=2)
+
+    # Adjust the column configuration for better layout control
+    frame.columnconfigure(0, weight=1)
+    frame.columnconfigure(1, weight=3)
+
+def update_info():
+    create_config_section('Info')
+    config.set('Info', 'operator_name', operator_name_var.get())
+    config.set('Info', 'standard_name', standard_name_var.get())
+    config.set('Info', 'standard_id', standard_id_var.get())
+    config.set('Info', 'unit_id', unit_id_var.get())
+    save_config()
+    display_images() 
+
+def create_config_section(section):
+    if not config.has_section(section):
+        config.add_section(section)
+    save_config()
 
 
 def calculate_intersection_area(circle1, circle2):
@@ -242,8 +335,8 @@ def toggle_circles():
 
         canvas.draw()
 
-def create_matplotlib_window():
-    global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, canvas, frame
+def create_matplotlib_window(right_frame):
+    global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, canvas
 
     fig_to_show = Figure(figsize=(10, 6))
     fig_to_save = Figure(figsize=(10, 6))
@@ -251,18 +344,13 @@ def create_matplotlib_window():
     ax_segmented = fig_to_show.add_subplot(122)
     ax_tosave = fig_to_save.add_subplot(111)
 
-    canvas = FigureCanvasTkAgg(fig_to_show, master=frame)
+    canvas = FigureCanvasTkAgg(fig_to_show, master=right_frame)
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-    toolbar = NavigationToolbar2Tk(canvas, frame)
+    toolbar = NavigationToolbar2Tk(canvas, right_frame)
     toolbar.update()
     toolbar.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    fig_to_show.subplots_adjust(bottom=0.4)
-    fig_to_save.subplots_adjust(bottom=0.4)
-    update_circle_text(current_time)  # Initialize with no circles
 
 def update_circle_text(circle_details):
     global circle_text_handle, fig_to_show, fig_to_save
@@ -272,8 +360,8 @@ def update_circle_text(circle_details):
             text.remove()
     # Set new circle detail text
     circle_text_handle = [
-        fig_to_show.text(0.5, 0.1, circle_details, ha='center', fontsize=10, transform=fig_to_show.transFigure),
-        fig_to_save.text(0.5, 0.1, circle_details, ha='center', fontsize=10, transform=fig_to_save.transFigure)
+        fig_to_show.text(0.5, 0.01, circle_details, ha='center', fontsize=10, transform=fig_to_show.transFigure),
+        fig_to_save.text(0.5, 0.01, circle_details, ha='center', fontsize=10, transform=fig_to_save.transFigure)
     ]
     canvas.draw()
 
@@ -283,7 +371,7 @@ def update_general_info(current_time):
     if general_text_handle is not None:
         general_text_handle.remove()
     # Set new general info text
-    general_text_handle = fig_to_show.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure)
+    general_text_handle = fig_to_show.text(0.5, 0.1, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure)
     fig_to_save.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_save.transFigure)
     canvas.draw()
 
@@ -332,6 +420,10 @@ def generate_report():
         ax_tosave.imshow(cv2.cvtColor(img_tosave, cv2.COLOR_BGR2RGB))
         ax_tosave.set_title("Original Image with Circles")
 
+        # Add the parameters as text on the figure
+        params_text = f"Operator: {operator_name_var.get()}\nStandard: {standard_name_var.get()}\nID: {standard_id_var.get()}\nUnit: {unit_id_var.get()}"
+        fig_to_save.text(0.1, 0.1, params_text, fontsize=10, transform=fig_to_save.transFigure)
+
         save_path = filedialog.asksaveasfilename(defaultextension='.pdf', filetypes=[('PDF files', '*.pdf')])
         if save_path:  # Check if a path was chosen
             fig_to_save.savefig(save_path, format='pdf', dpi=1000)
@@ -344,19 +436,9 @@ def generate_report():
 if __name__ == "__main__":
     root = tk.Tk()
     root.title("Circle Detection Tool")
+    
+    setup_gui(root)
 
-    frame = tk.Frame(root)
-    frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-
-    create_matplotlib_window()
-
-    load_button = Button(root, text="Load Image", command=load_image)
-    load_button.pack(side=tk.BOTTOM)
-
-    save_button = Button(root, text="Generate Report", command=generate_report)
-    save_button.pack(side=tk.BOTTOM)
-
-    toggle_button = Button(root, text="Show/Hide", command=toggle_circles)
-    toggle_button.pack(side=tk.BOTTOM)
+    load_config()
 
     root.mainloop()
