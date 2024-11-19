@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import Button, filedialog
+from tkinter import Button, filedialog, messagebox
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
@@ -328,9 +328,14 @@ def generate_report():
         ax_tosave.imshow(cv2.cvtColor(img_tosave, cv2.COLOR_BGR2RGB))
         ax_tosave.set_title("Original Image with Circles")
 
-        pdf_file = sensor_name + ".pdf"
-        fig_to_save.savefig(pdf_file, format='pdf', dpi=1000)
-        print(f"Report saved as {pdf_file}")
+        save_path = filedialog.asksaveasfilename(defaultextension='.pdf', filetypes=[('PDF files', '*.pdf')])
+        if save_path:  # Check if a path was chosen
+            fig_to_save.savefig(save_path, format='pdf', dpi=1000)
+            messagebox.showinfo("Save Report", f"Report saved as {save_path}")
+        else:
+            messagebox.showinfo("Save Report", "Saving cancelled.")
+    else:
+        messagebox.showinfo("Save Report", "No image loaded or no circles detected to generate a report.")
 
 if __name__ == "__main__":
     root = tk.Tk()
