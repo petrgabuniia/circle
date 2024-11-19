@@ -253,6 +253,7 @@ def refine_circle(image, circle, step_size=1, max_shift=5, max_radius_change=10)
             best_precision = precision
     return (best_center[0], best_center[1], best_radius)
 
+
 def find_circles(image):
     if image is None:
         print("Failed to load image")
@@ -370,10 +371,10 @@ def create_matplotlib_window(right_frame):
     global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, canvas
 
     fig_to_show = Figure(figsize=(10, 6))
-    fig_to_save = Figure(figsize=(10, 6))
+    fig_to_save = Figure(figsize=(10, 6))  # Separate figure for saving
     ax_original = fig_to_show.add_subplot(121)
     ax_segmented = fig_to_show.add_subplot(122)
-    ax_tosave = fig_to_save.add_subplot(111)
+    ax_tosave = fig_to_save.add_subplot(111)  # This is for the save figure
 
     canvas = FigureCanvasTkAgg(fig_to_show, master=right_frame)
     canvas.draw()
@@ -389,10 +390,10 @@ def update_circle_text(circle_details):
     if circle_text_handle is not None:
         for text in circle_text_handle:
             text.remove()
-    # Set new circle detail text
+    # Set new circle detail text, positioning it on the left side in fig_to_save tuuuuut
     circle_text_handle = [
         fig_to_show.text(0.5, 0.01, circle_details, ha='center', fontsize=10, transform=fig_to_show.transFigure),
-        fig_to_save.text(0.5, 0.01, circle_details, ha='center', fontsize=10, transform=fig_to_save.transFigure)
+        fig_to_save.text(0.01, 0.5, circle_details, ha='left', va='center', fontsize=10, transform=fig_to_save.transFigure)
     ]
     canvas.draw()
 
@@ -401,19 +402,23 @@ def update_general_info(current_time):
     # Remove existing general info text
     if general_text_handle is not None:
         general_text_handle.remove()
-    # Set new general info text
-    general_text_handle = fig_to_show.text(0.5, 0.1, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure)
-    fig_to_save.text(0.5, 0.05, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_save.transFigure)
+    # Set new general info text, formatting and positioning adjusted for clarity
+    general_text_handle = [
+        fig_to_show.text(0.5, 0.1, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure),
+        fig_to_save.text(0.01, 0.1, f"Generated on: {current_time}", ha='left', fontsize=10, style='italic', transform=fig_to_save.transFigure)
+    ]
     canvas.draw()
 
 def display_images():
-    global canvas, ax_original, ax_segmented, circles
+    global canvas, ax_original, ax_segmented, ax_tosave, circles
 
     if circles is not None and circles.any():
         img_with_circles = draw_circles(circles, image)
         img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
-        circle_details = "\n".join([f"Circle at ({circle[0]}, {circle[1]}) with radius {circle[2]}" for circle in circles[0]])
+        circle_details = "\n".join([f"Circle ({circle[0]}, {circle[1]}) radius {circle[2]}" for circle in circles[0]])
     else:
+        img_with_circles = image
+        img_with_circles_segmented = segmented_image
         circle_details = "No circles detected"
 
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -422,10 +427,13 @@ def display_images():
 
     ax_original.clear()
     ax_segmented.clear()
-    ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB) if circles is not None and circles.any() else image)
-    ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB) if circles is not None and circles.any() else segmented_image)
+    ax_tosave.clear()  # Clear the save figure axis
+    ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+    ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+    ax_tosave.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))  # Set the save figure
     ax_original.set_title("Original Image with Circles")
     ax_segmented.set_title("Watershed Image with Circles (in color)")
+    ax_tosave.set_title("Report")
 
     canvas.draw()
 
@@ -443,26 +451,27 @@ def load_image():
 
 
 def generate_report():
-    global circles, fig_to_save
+    global fig_to_save, canvas
 
     if circles is not None:
-        img_tosave = draw_circles(circles, image)
-        ax_tosave.clear()
-        ax_tosave.imshow(cv2.cvtColor(img_tosave, cv2.COLOR_BGR2RGB))
-        ax_tosave.set_title("Original Image with Circles")
-
-        # Add the parameters as text on the figure
         params_text = f"Operator: {operator_name_var.get()}\nStandard: {standard_name_var.get()}\nID: {standard_id_var.get()}\nUnit: {unit_id_var.get()}"
-        fig_to_save.text(0.1, 0.1, params_text, fontsize=10, transform=fig_to_save.transFigure)
+        info_text_handle = fig_to_save.text(0.01, 0.25, params_text, ha='left', va='top', fontsize=10, transform=fig_to_save.transFigure)
 
+        # Prompt for where to save the PDF
         save_path = filedialog.asksaveasfilename(defaultextension='.pdf', filetypes=[('PDF files', '*.pdf')])
         if save_path:  # Check if a path was chosen
-            fig_to_save.savefig(save_path, format='pdf', dpi=1000)
+            fig_to_save.savefig(save_path, format='pdf', dpi=300)  # You can adjust the dpi as necessary
             messagebox.showinfo("Save Report", f"Report saved as {save_path}")
+            info_text_handle.remove()
+            canvas.draw()
         else:
             messagebox.showinfo("Save Report", "Saving cancelled.")
+            info_text_handle.remove()
+            canvas.draw()
     else:
         messagebox.showinfo("Save Report", "No image loaded or no circles detected to generate a report.")
+
+
 
 if __name__ == "__main__":
     root = tk.Tk()
