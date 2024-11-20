@@ -8,7 +8,7 @@ import cv2
 from datetime import datetime
 import configparser
 
-config = configparser.ConfigParser()
+
 
 
 # Global variables
@@ -19,7 +19,7 @@ min_precision = 0.05
 sensor_name = "Sensor Name"
 circle_text_handle = []
 general_text_handle = []
-
+config = configparser.ConfigParser()
 operator_name_var = None
 standard_name_var = None
 standard_id_var = None
@@ -41,16 +41,12 @@ def load_config():
     standard_id_var.set(config.get('Info', 'standard_id', fallback=""))
     unit_id_var.set(config.get('Info', 'unit_id', fallback=""))
 
-
-
 def save_config():
     try:
         with open('data.ini', 'w') as configfile:
             config.write(configfile)
     except Exception as e:
         messagebox.showerror("Error", f"Could not save the configuration: {e}")
-
-
 
 def create_config_section(section):
     if not config.has_section(section):
@@ -67,7 +63,7 @@ def setup_gui(root):
     create_matplotlib_window(left_frame)
 
 def add_info_fields(main_frame):
-    global operator_name_var, standard_name_var, standard_id_var, unit_id_var
+    global operator_name_var, standard_name_var, standard_id_var, unit_id_var, manual_thresh_var
 
     frame = tk.Frame(main_frame)
     frame.pack(fill=tk.BOTH, expand=True)  
@@ -76,6 +72,7 @@ def add_info_fields(main_frame):
     standard_name_var = tk.StringVar(value=config.get('Info', 'standard_name') if config.has_option('Info', 'standard_name') else "")
     standard_id_var = tk.StringVar(value=config.get('Info', 'standard_id') if config.has_option('Info', 'standard_id') else "")
     unit_id_var = tk.StringVar(value=config.get('Info', 'unit_id') if config.has_option('Info', 'unit_id') else "")
+    manual_thresh_var = tk.StringVar(value="60")  # Default or previously saved value
 
     operator_entry = Entry(frame, textvariable=operator_name_var)
     operator_entry.grid(row=0, column=1, sticky='ew')
@@ -93,20 +90,36 @@ def add_info_fields(main_frame):
     unit_id_entry.grid(row=3, column=1, sticky='ew')
     Label(frame, text="Unit ID:").grid(row=3, column=0, sticky='w')
 
+    manual_thresh_entry = Entry(frame, textvariable=manual_thresh_var)
+    manual_thresh_entry.grid(row=4, column=1, sticky='ew')
+    Label(frame, text="Manual Threshold:").grid(row=4, column=0, sticky='w')
+
     update_button = Button(frame, text="Update Info", command=update_info)
-    update_button.grid(row=4, column=0, columnspan=2)
+    update_button.grid(row=5, column=0, columnspan=2)
+
+    recalc_button = Button(frame, text="Recalculate", command=lambda: recalculate_image(int(manual_thresh_var.get())))
+    recalc_button.grid(row=6, column=0, columnspan=2)
 
     load_button = tk.Button(frame, text="Load Image", command=load_image)
-    load_button.grid(row=5, column=0, columnspan=2)
+    load_button.grid(row=7, column=0, columnspan=2)
 
     save_button = tk.Button(frame, text="Generate Report", command=generate_report)
-    save_button.grid(row=6, column=0, columnspan=2)
+    save_button.grid(row=8, column=0, columnspan=2)
 
     toggle_button = tk.Button(frame, text="Show/Hide Circles", command=toggle_circles)
-    toggle_button.grid(row=7, column=0, columnspan=2)
+    toggle_button.grid(row=9, column=0, columnspan=2)
 
     frame.columnconfigure(0, weight=1)
     frame.columnconfigure(1, weight=3)
+
+def recalculate_image(new_thresh):
+    global image, segmented_image, circles
+    if image is not None:
+        segmented_image = watershed_segmentation(image, manual_thresh=new_thresh, adaptive_thresh=False)
+        circles = find_circles(segmented_image)
+        display_images()
+    else:
+        messagebox.showerror("Recalculate", "No image loaded to recalculate.")
 
 def update_info():
     create_config_section('Info')
@@ -137,7 +150,6 @@ def update_info():
     else:
         save_config()
         messagebox.showinfo("Update Info", "No changes detected, but configuration file has been ensured.")
-
 
 
 
