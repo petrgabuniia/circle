@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import Button, filedialog, messagebox, Entry, Label
+from tkinter import Button, filedialog, messagebox, Entry, Label, StringVar
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
@@ -17,8 +17,8 @@ fig, ax, canvas = None, None, None
 image, segmented_image, circles = None, None, None
 min_precision = 0.05
 sensor_name = "Sensor Name"
-circle_text_handle = None
-general_text_handle = None
+circle_text_handle = []
+general_text_handle = []
 
 operator_name_var = None
 standard_name_var = None
@@ -386,11 +386,12 @@ def create_matplotlib_window(right_frame):
 
 def update_circle_text(circle_details):
     global circle_text_handle, fig_to_show, fig_to_save
-    # Remove existing circle detail text
+    # Check if circle_text_handle exists and remove the previous text
     if circle_text_handle is not None:
         for text in circle_text_handle:
             text.remove()
-    # Set new circle detail text, positioning it on the left side in fig_to_save tuuuuut
+
+    # Update the text with new circle details
     circle_text_handle = [
         fig_to_show.text(0.5, 0.01, circle_details, ha='center', fontsize=10, transform=fig_to_show.transFigure),
         fig_to_save.text(0.01, 0.5, circle_details, ha='left', va='center', fontsize=10, transform=fig_to_save.transFigure)
@@ -399,55 +400,67 @@ def update_circle_text(circle_details):
 
 def update_general_info(current_time):
     global general_text_handle, fig_to_show, fig_to_save
-    # Remove existing general info text
+    # Check if general_text_handle is None or not
     if general_text_handle is not None:
-        general_text_handle.remove()
-    # Set new general info text, formatting and positioning adjusted for clarity
+        for text in general_text_handle:
+            text.remove()  # Remove each text object if it exists
+
+    # Always recreate text to update the information
     general_text_handle = [
-        fig_to_show.text(0.5, 0.1, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure),
+        fig_to_show.text(0.5, 0.9, f"Generated on: {current_time}", ha='center', fontsize=10, style='italic', transform=fig_to_show.transFigure),
         fig_to_save.text(0.01, 0.1, f"Generated on: {current_time}", ha='left', fontsize=10, style='italic', transform=fig_to_save.transFigure)
     ]
     canvas.draw()
 
+
 def display_images():
-    global canvas, ax_original, ax_segmented, ax_tosave, circles
+    global canvas, ax_original, ax_segmented, ax_tosave
+    print("Updating GUI with new images...")
 
-    if circles is not None and circles.any():
-        img_with_circles = draw_circles(circles, image)
-        img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
-        circle_details = "\n".join([f"Circle ({circle[0]}, {circle[1]}) radius {circle[2]}" for circle in circles[0]])
+    if image is not None:
+        if circles is not None and circles.any():
+            img_with_circles = draw_circles(circles, image)
+            img_with_circles_segmented = draw_circles(circles, segmented_image, color=(0, 255, 0))
+            circle_details = "\n".join([f"Circle ({circle[0]}, {circle[1]}) radius {circle[2]}" for circle in circles[0]])
+        else:
+            img_with_circles = image
+            img_with_circles_segmented = segmented_image
+            circle_details = "No circles detected"
+
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        update_circle_text(circle_details)
+        update_general_info(current_time)
+
+        ax_original.clear()
+        ax_segmented.clear()
+        ax_tosave.clear()  # Clear the save figure axis
+        ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
+        ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
+        ax_tosave.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))  # Set the save figure
+        ax_original.set_title("Original Image with Circles")
+        ax_segmented.set_title("Watershed Image with Circles (in color)")
+        ax_tosave.set_title("Report")
+
+        canvas.draw()
+        print("Canvas updated.")
     else:
-        img_with_circles = image
-        img_with_circles_segmented = segmented_image
-        circle_details = "No circles detected"
+        print("No image available to display.")
 
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    update_circle_text(circle_details)
-    update_general_info(current_time)
-
-    ax_original.clear()
-    ax_segmented.clear()
-    ax_tosave.clear()  # Clear the save figure axis
-    ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
-    ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
-    ax_tosave.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))  # Set the save figure
-    ax_original.set_title("Original Image with Circles")
-    ax_segmented.set_title("Watershed Image with Circles (in color)")
-    ax_tosave.set_title("Report")
-
-    canvas.draw()
 
 
 def load_image():
-    global image, segmented_image, circles, sensor_name
-
+    global image, segmented_image, circles
     file_path = filedialog.askopenfilename()
     if file_path:
-        sensor_name = file_path.split("/")[-1].split(".")[0]
         image = cv2.imread(file_path)
-        segmented_image = watershed_segmentation(image, manual_thresh=60, adaptive_thresh=False)
-        circles = find_circles(segmented_image)
-        display_images()
+        if image is not None:
+            print("Image loaded successfully.")
+            segmented_image = watershed_segmentation(image, manual_thresh=60, adaptive_thresh=False)
+            circles = find_circles(segmented_image)
+            display_images()
+        else:
+            messagebox.showerror("Load Image", "Failed to load the image.")
+            print("Failed to load image at:", file_path)
 
 
 def generate_report():
