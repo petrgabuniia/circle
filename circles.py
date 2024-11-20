@@ -60,10 +60,11 @@ def setup_gui(root):
     left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     add_info_fields(right_frame)
+    add_manual_thresh_field(right_frame)  # Separate function for manual threshold and recalculate button
     create_matplotlib_window(left_frame)
 
 def add_info_fields(main_frame):
-    global operator_name_var, standard_name_var, standard_id_var, unit_id_var, manual_thresh_var
+    global operator_name_var, standard_name_var, standard_id_var, unit_id_var
 
     frame = tk.Frame(main_frame)
     frame.pack(fill=tk.BOTH, expand=True)  
@@ -72,7 +73,6 @@ def add_info_fields(main_frame):
     standard_name_var = tk.StringVar(value=config.get('Info', 'standard_name') if config.has_option('Info', 'standard_name') else "")
     standard_id_var = tk.StringVar(value=config.get('Info', 'standard_id') if config.has_option('Info', 'standard_id') else "")
     unit_id_var = tk.StringVar(value=config.get('Info', 'unit_id') if config.has_option('Info', 'unit_id') else "")
-    manual_thresh_var = tk.StringVar(value="60")  # Default or previously saved value
 
     operator_entry = Entry(frame, textvariable=operator_name_var)
     operator_entry.grid(row=0, column=1, sticky='ew')
@@ -90,27 +90,32 @@ def add_info_fields(main_frame):
     unit_id_entry.grid(row=3, column=1, sticky='ew')
     Label(frame, text="Unit ID:").grid(row=3, column=0, sticky='w')
 
-    manual_thresh_entry = Entry(frame, textvariable=manual_thresh_var)
-    manual_thresh_entry.grid(row=4, column=1, sticky='ew')
-    Label(frame, text="Manual Threshold:").grid(row=4, column=0, sticky='w')
-
     update_button = Button(frame, text="Update Info", command=update_info)
-    update_button.grid(row=5, column=0, columnspan=2)
-
-    recalc_button = Button(frame, text="Recalculate", command=lambda: recalculate_image(int(manual_thresh_var.get())))
-    recalc_button.grid(row=6, column=0, columnspan=2)
+    update_button.grid(row=4, column=0, columnspan=2)
 
     load_button = tk.Button(frame, text="Load Image", command=load_image)
-    load_button.grid(row=7, column=0, columnspan=2)
+    load_button.grid(row=5, column=0, columnspan=2)
 
     save_button = tk.Button(frame, text="Generate Report", command=generate_report)
-    save_button.grid(row=8, column=0, columnspan=2)
+    save_button.grid(row=6, column=0, columnspan=2)
 
     toggle_button = tk.Button(frame, text="Show/Hide Circles", command=toggle_circles)
-    toggle_button.grid(row=9, column=0, columnspan=2)
+    toggle_button.grid(row=7, column=0, columnspan=2)
 
-    frame.columnconfigure(0, weight=1)
-    frame.columnconfigure(1, weight=3)
+def add_manual_thresh_field(main_frame):
+    global manual_thresh_var
+
+    frame = tk.Frame(main_frame)
+    frame.pack(fill=tk.BOTH, expand=True, pady=10)  # Padding to separate from other fields
+
+    manual_thresh_var = tk.StringVar(value="60")  # Default or previously saved value
+
+    manual_thresh_entry = Entry(frame, textvariable=manual_thresh_var)
+    manual_thresh_entry.grid(row=0, column=1, sticky='ew')
+    Label(frame, text="Manual Threshold:").grid(row=0, column=0, sticky='w')
+
+    recalc_button = Button(frame, text="Recalculate", command=lambda: recalculate_image(int(manual_thresh_var.get())))
+    recalc_button.grid(row=1, column=0, columnspan=2)
 
 def recalculate_image(new_thresh):
     global image, segmented_image, circles
