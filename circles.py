@@ -161,6 +161,39 @@ def update_info():
         save_config()
         messagebox.showinfo("Update Info", "No changes detected, but configuration file has been ensured.")
 
+def sync_figures_for_save():
+    global fig_to_show, fig_to_save, ax_original, ax_segmented, ax_tosave, canvas
+    
+    # Disconnect the draw event to prevent recursion
+    draw_event_connection = canvas.mpl_disconnect(on_draw_event)
+
+    if ax_original.get_images():
+        ax_tosave.clear()
+        img_array = ax_original.get_images()[0].get_array()
+        ax_tosave.imshow(cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB))
+        ax_tosave.set_xlim(ax_original.get_xlim())
+        ax_tosave.set_ylim(ax_original.get_ylim())
+        ax_tosave.set_title("Report")
+
+        if show_circles and circles is not None:
+            draw_circles(circles, ax_tosave.get_images()[0].get_array(), color=(0, 255, 0))
+
+        # Since updates are done, trigger a redraw when idle
+        canvas.draw_idle()
+
+    # Reconnect the draw event
+    canvas.mpl_connect('draw_event', on_draw_event)
+
+
+
+def on_draw_event(event):
+    if ax_original.get_images():  # Check if there are images to synchronize
+        sync_figures_for_save()
+        canvas.draw_idle()  # Redraw the canvas when idle to avoid immediate re-triggering
+
+
+
+
 
 
 def calculate_intersection_area(circle1, circle2):
@@ -406,6 +439,10 @@ def create_matplotlib_window(right_frame):
     toolbar.update()
     toolbar.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
+    # Connect the draw event to the on_draw_event function
+    canvas.mpl_connect('draw_event', on_draw_event)
+
+
 def update_circle_text(circle_details):
     global circle_text_handle, fig_to_show, fig_to_save
     # Check if circle_text_handle exists and remove the previous text
@@ -455,18 +492,18 @@ def display_images():
 
         ax_original.clear()
         ax_segmented.clear()
-        ax_tosave.clear()  # Clear the save figure axis
         ax_original.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))
         ax_segmented.imshow(cv2.cvtColor(img_with_circles_segmented, cv2.COLOR_BGR2RGB))
-        ax_tosave.imshow(cv2.cvtColor(img_with_circles, cv2.COLOR_BGR2RGB))  # Set the save figure
+
         ax_original.set_title("Original Image with Circles")
         ax_segmented.set_title("Watershed Image with Circles (in color)")
-        ax_tosave.set_title("Report")
 
         canvas.draw()
+        sync_figures_for_save()  # Ensure the save figure is updated
         print("Canvas updated.")
     else:
         print("No image available to display.")
+
 
 
 
@@ -489,7 +526,7 @@ def generate_report():
     global fig_to_save, canvas
 
     if circles is not None:
-        params_text = f"Operator: {operator_name_var.get()}\nStandard: {standard_name_var.get()}\nID: {standard_id_var.get()}\nUnit: {unit_id_var.get()}"
+        params_text = f"Operator: {operator_name_var.get()}\nStandard ID: {standard_name_var.get()}\nUnit ID: {standard_id_var.get()}\nUnit: {unit_id_var.get()}"
         info_text_handle = fig_to_save.text(0.01, 0.25, params_text, ha='left', va='top', fontsize=10, transform=fig_to_save.transFigure)
 
         # Ask user for DPI input
