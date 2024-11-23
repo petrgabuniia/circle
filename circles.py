@@ -1,8 +1,7 @@
 import tkinter as tk
-from tkinter import Button, filedialog, messagebox, Entry, Label, StringVar
+from tkinter import Button, filedialog, messagebox, Entry, Label, simpledialog
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from datetime import datetime
@@ -487,13 +486,21 @@ def generate_report():
         params_text = f"Operator: {operator_name_var.get()}\nStandard: {standard_name_var.get()}\nID: {standard_id_var.get()}\nUnit: {unit_id_var.get()}"
         info_text_handle = fig_to_save.text(0.01, 0.25, params_text, ha='left', va='top', fontsize=10, transform=fig_to_save.transFigure)
 
+        # Ask user for DPI input
+        dpi_input = simpledialog.askinteger("Input DPI", "Enter the DPI for the report:", minvalue=72, maxvalue=1200, initialvalue=300)
+        if dpi_input is None:
+            messagebox.showinfo("Save Report", "Report generation cancelled.")
+            info_text_handle.remove()
+            canvas.draw()
+            return
+
         current_time = datetime.now().strftime("%Y-%m-%d %H-%M")
         unit_id = unit_id_var.get()
         default_filename = f"Resolution Report {current_time} ID {unit_id}.pdf"
         
         save_path = filedialog.asksaveasfilename(defaultextension='.pdf', filetypes=[('PDF files', '*.pdf')], initialfile=default_filename)
         if save_path: 
-            fig_to_save.savefig(save_path, format='pdf', dpi=300)  
+            fig_to_save.savefig(save_path, format='pdf', dpi=dpi_input)  
             messagebox.showinfo("Save Report", f"Report saved as {save_path}")
             info_text_handle.remove()
             canvas.draw()
@@ -503,6 +510,7 @@ def generate_report():
             canvas.draw()
     else:
         messagebox.showinfo("Save Report", "No image loaded or no circles detected to generate a report.")
+
 
 
 
