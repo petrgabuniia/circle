@@ -105,16 +105,22 @@ def add_manual_thresh_field(main_frame):
     global manual_thresh_var
 
     frame = tk.Frame(main_frame)
-    frame.pack(fill=tk.BOTH, expand=True, pady=10)  # Padding to separate from other fields
+    frame.pack(fill=tk.BOTH, expand=True, pady=10)  
 
-    manual_thresh_var = tk.StringVar(value="60")  # Default or previously saved value
+    manual_thresh_var = tk.StringVar(value="60")  
 
     manual_thresh_entry = Entry(frame, textvariable=manual_thresh_var)
     manual_thresh_entry.grid(row=0, column=1, sticky='ew')
     Label(frame, text="Manual Threshold:").grid(row=0, column=0, sticky='w')
 
     recalc_button = Button(frame, text="Recalculate", command=lambda: recalculate_image(int(manual_thresh_var.get())))
-    recalc_button.grid(row=1, column=0, columnspan=2)
+    recalc_button.grid(row=1, column=1)
+
+    question_btn = Button(frame, text="?", command=show_threshold_info)
+    question_btn.grid(row=0, column=2, padx=5)  
+def show_threshold_info():
+    messagebox.showinfo("Threshold Information", "Threshold is a value used to determine the boundary level for pixel values in the image processing. Lower threshold values will decrease the number of found circles and their radius while incrreasing it will result oposite.")
+
 
 def recalculate_image(new_thresh):
     global image, segmented_image, circles
