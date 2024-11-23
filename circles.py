@@ -487,10 +487,13 @@ def generate_report():
         params_text = f"Operator: {operator_name_var.get()}\nStandard: {standard_name_var.get()}\nID: {standard_id_var.get()}\nUnit: {unit_id_var.get()}"
         info_text_handle = fig_to_save.text(0.01, 0.25, params_text, ha='left', va='top', fontsize=10, transform=fig_to_save.transFigure)
 
-        # Prompt for where to save the PDF
-        save_path = filedialog.asksaveasfilename(defaultextension='.pdf', filetypes=[('PDF files', '*.pdf')])
-        if save_path:  # Check if a path was chosen
-            fig_to_save.savefig(save_path, format='pdf', dpi=300)  # You can adjust the dpi as necessary
+        current_time = datetime.now().strftime("%Y-%m-%d %H-%M")
+        unit_id = unit_id_var.get()
+        default_filename = f"Resolution Report {current_time} ID {unit_id}.pdf"
+        
+        save_path = filedialog.asksaveasfilename(defaultextension='.pdf', filetypes=[('PDF files', '*.pdf')], initialfile=default_filename)
+        if save_path: 
+            fig_to_save.savefig(save_path, format='pdf', dpi=300)  
             messagebox.showinfo("Save Report", f"Report saved as {save_path}")
             info_text_handle.remove()
             canvas.draw()
@@ -500,6 +503,7 @@ def generate_report():
             canvas.draw()
     else:
         messagebox.showinfo("Save Report", "No image loaded or no circles detected to generate a report.")
+
 
 
 
